@@ -27,7 +27,7 @@ With `xcaddy` installed, from this directory:
 
 ```bash
 xcaddy build v2.11.4 \
-  --with github.com/avalitan/caddy-tls-sans-json=.
+  --with github.com/avalitan/caddy-tls-sans-json
 ```
 
 For an existing custom build, add the same `--with` argument alongside your other modules.
