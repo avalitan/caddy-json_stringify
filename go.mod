@@ -1,4 +1,4 @@
-module github.com/avalitan/caddy-tls-sans-json
+module github.com/avalitan/caddy-json_stringify
 
 go 1.25
 
