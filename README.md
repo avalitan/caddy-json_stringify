@@ -187,7 +187,7 @@ With `xcaddy` installed:
 
 ```bash
 xcaddy build \
-  --with github.com/avalitan/caddy-json_stringify@main
+  --with github.com/avalitan/caddy-json_stringify
 ```
 
 For an existing custom build, add the same `--with` argument alongside your other modules.
