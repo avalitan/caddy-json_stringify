@@ -10,56 +10,55 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
-const (
-	legacyDestination = "http.request.tls.client.san.dns_names_json"
-)
-
 func init() {
 	caddy.RegisterModule(Handler{})
 }
 
 // Handler JSON-encodes a native Caddy replacer value and stores the encoded
-// string in another replacer value.
+// JSON text as a string in another replacer value.
 //
-// Source and Destination may be written either as bare replacer keys:
+// Source aliases:
+//   - source
+//   - get
+//   - src
+//
+// Destination aliases:
+//   - destination
+//   - set
+//   - dest
+//
+// Values may be written either as bare replacer keys:
 //
 //   http.request.tls.client.san.dns_names
 //
 // or as normal Caddy placeholders:
 //
 //   {http.request.tls.client.san.dns_names}
-//
-// For backwards compatibility, when both fields are omitted the handler keeps
-// its original behavior: the client certificate Common Name is prepended to
-// the DNS SAN list and the JSON string is stored in
-// http.request.tls.client.san.dns_names_json.
 type Handler struct {
 	Source      string `json:"source,omitempty"`
+	Get         string `json:"get,omitempty"`
+	Src         string `json:"src,omitempty"`
 	Destination string `json:"destination,omitempty"`
+	Set         string `json:"set,omitempty"`
+	Dest        string `json:"dest,omitempty"`
 }
 
 // CaddyModule returns the Caddy module information.
 func (Handler) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
-		ID:  "http.handlers.tls_sans_json",
+		ID:  "http.handlers.json_stringify",
 		New: func() caddy.Module { return new(Handler) },
 	}
 }
 
 // Validate validates the handler configuration.
 func (h Handler) Validate() error {
-	// Both omitted means legacy mode.
-	if h.Source == "" && h.Destination == "" {
-		return nil
+	if _, err := resolveAlias("source", h.Source, h.Get, h.Src); err != nil {
+		return err
 	}
-
-	if normalizePlaceholder(h.Source) == "" {
-		return fmt.Errorf("source must be set when destination is set")
+	if _, err := resolveAlias("destination", h.Destination, h.Set, h.Dest); err != nil {
+		return err
 	}
-	if normalizePlaceholder(h.Destination) == "" {
-		return fmt.Errorf("destination must be set when source is set")
-	}
-
 	return nil
 }
 
@@ -70,31 +69,14 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 		return caddyhttp.Error(http.StatusInternalServerError, fmt.Errorf("request replacer is unavailable"))
 	}
 
-	// Backwards-compatible behavior for existing configurations which have no
-	// source/destination fields.
-	if h.Source == "" && h.Destination == "" {
-		names := make([]string, 0)
-
-		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-			cert := r.TLS.PeerCertificates[0]
-
-			if cert.Subject.CommonName != "" {
-				names = append(names, cert.Subject.CommonName)
-			}
-			names = append(names, cert.DNSNames...)
-		}
-
-		encoded, err := json.Marshal(names)
-		if err != nil {
-			return caddyhttp.Error(http.StatusInternalServerError, err)
-		}
-
-		repl.Set(legacyDestination, string(encoded))
-		return next.ServeHTTP(w, r)
+	source, err := resolveAlias("source", h.Source, h.Get, h.Src)
+	if err != nil {
+		return caddyhttp.Error(http.StatusInternalServerError, err)
 	}
-
-	source := normalizePlaceholder(h.Source)
-	destination := normalizePlaceholder(h.Destination)
+	destination, err := resolveAlias("destination", h.Destination, h.Set, h.Dest)
+	if err != nil {
+		return caddyhttp.Error(http.StatusInternalServerError, err)
+	}
 
 	value, found := repl.Get(source)
 	if !found {
@@ -114,6 +96,32 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 
 	repl.Set(destination, string(encoded))
 	return next.ServeHTTP(w, r)
+}
+
+func resolveAlias(kind string, values ...string) (string, error) {
+	var resolved string
+
+	for _, value := range values {
+		value = normalizePlaceholder(value)
+		if value == "" {
+			continue
+		}
+
+		if resolved == "" {
+			resolved = value
+			continue
+		}
+
+		if value != resolved {
+			return "", fmt.Errorf("conflicting %s aliases configured", kind)
+		}
+	}
+
+	if resolved == "" {
+		return "", fmt.Errorf("%s is required", kind)
+	}
+
+	return resolved, nil
 }
 
 func normalizePlaceholder(value string) string {
