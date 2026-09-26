@@ -1,4 +1,4 @@
-# caddy-tls-sans-json
+# caddy-json_stringify
 
 A tiny Caddy v2 HTTP handler that reads a native value from Caddy's request replacer, JSON-encodes it, and stores the encoded result as a string in another replacer value.
 
