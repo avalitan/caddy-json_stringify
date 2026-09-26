@@ -1,6 +1,6 @@
 # caddy-json_stringify
 
-A tiny Caddy v2 HTTP handler that reads a native value from Caddy's request replacer, JSON-encodes it, and stores the encoded result as a string in another replacer value.
+A tiny Caddy v2 HTTP handler that reads native values from Caddy's request replacer, JSON-encodes them, and stores the encoded result as a string in another replacer value.
 
 This is useful when a Caddy placeholder contains a native Go value such as an array, object/map, boolean, number, or string, but a later handler such as `request_body` needs valid JSON text.
 
@@ -24,9 +24,73 @@ You can then use:
 
 in handlers that consume placeholders as strings.
 
+## Multiple sources and array merging
+
+Use `sources` when you want to merge several values into one JSON array:
+
+```json
+{
+  "handler": "json_stringify",
+  "sources": [
+    "[{client_cert_cn}]",
+    "{http.request.tls.client.san.dns_names}"
+  ],
+  "dest": "http.request.tls.client.names_json"
+}
+```
+
+If:
+
+```text
+{client_cert_cn} = "test.avalitan.moe"
+{http.request.tls.client.san.dns_names} = []string{
+  "test.avalitan.com",
+  "tester.avalitan.moe",
+  "tester.avalitan.com",
+}
+```
+
+then:
+
+```text
+{http.request.tls.client.names_json}
+```
+
+contains:
+
+```json
+["test.avalitan.moe","test.avalitan.com","tester.avalitan.moe","tester.avalitan.com"]
+```
+
+Multi-source expressions support two useful native-value forms:
+
+```text
+{placeholder}
+```
+
+fetches the placeholder as its native Caddy replacer value, while:
+
+```text
+[{placeholder}]
+```
+
+wraps that native value in a one-element array before merging.
+
+Top-level arrays contributed by each source are flattened one level into the final array. Scalars and objects are appended as individual array elements.
+
+Other source expressions are placeholder-expanded and parsed as JSON when possible. If the expanded result is not valid JSON, it is treated as a plain string.
+
+Use either `source` or `sources`, not both.
+
+Plural source aliases are also available:
+
+- `sources`
+- `gets`
+- `srcs`
+
 ## Source and destination aliases
 
-The source may be configured with any one of:
+The single source may be configured with any one of:
 
 - `source`
 - `get`
@@ -58,13 +122,13 @@ or:
 }
 ```
 
-Bare replacer keys and normal `{placeholder}` syntax are both accepted. Braces are stripped before lookup/storage.
+Bare replacer keys and normal `{placeholder}` syntax are both accepted in single-source mode. Braces are stripped before lookup/storage.
 
 You may specify more than one alias only if they resolve to the same value. Conflicting aliases cause configuration validation to fail.
 
 ## Required configuration
 
-Both a source and a destination are required.
+A destination and either `source` or `sources` are required.
 
 This is invalid:
 
@@ -105,26 +169,15 @@ The destination value itself is stored as a string in Caddy's replacer. This mea
 ```json
 {
   "handler": "json_stringify",
-  "source": "http.request.tls.client.san.dns_names",
-  "destination": "my.sans_json"
+  "sources": [
+    "[{client_cert_cn}]",
+    "{http.request.tls.client.san.dns_names}"
+  ],
+  "dest": "http.request.tls.client.names_json"
 },
 {
   "handler": "request_body",
-  "set": "\\{\"host\":{my.sans_json}}"
-}
-```
-
-If the native source value is:
-
-```text
-[]string{"foo.example.com", "bar.example.com"}
-```
-
-the generated request body contains:
-
-```json
-{
-  "host": ["foo.example.com", "bar.example.com"]
+  "set": "\\{\"host\":{http.request.tls.client.names_json}}"
 }
 ```
 
@@ -134,15 +187,16 @@ With `xcaddy` installed:
 
 ```bash
 xcaddy build \
-  --with github.com/avalitan/caddy-json_stringify
+  --with github.com/avalitan/caddy-json_stringify@main
 ```
 
 For an existing custom build, add the same `--with` argument alongside your other modules.
 
 ## Notes
 
-- The source must exist in Caddy's request replacer when this handler runs.
-- If the source placeholder is unknown, the request fails with an HTTP 500 error.
-- Both source and destination are required.
-- Conflicting aliases for source or destination cause configuration validation to fail.
+- Source placeholders must exist in Caddy's request replacer when this handler runs.
+- If a source placeholder is unknown, the request fails with an HTTP 500 error.
+- A destination and either a single source or multiple sources are required.
+- `source` and `sources` cannot be configured together.
+- Conflicting aliases cause configuration validation to fail.
 - The destination is overwritten if it already exists.
