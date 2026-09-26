@@ -133,8 +133,8 @@ the generated request body contains:
 With `xcaddy` installed:
 
 ```bash
-xcaddy build v2.11.4 \
-  --with github.com/avalitan/caddy-tls-sans-json
+xcaddy build \
+  --with github.com/avalitan/caddy-json_stringify)
 ```
 
 For an existing custom build, add the same `--with` argument alongside your other modules.
