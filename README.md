@@ -42,11 +42,11 @@ Use `sources` when you want to merge several values into one JSON array:
 If:
 
 ```text
-{client_cert_cn} = "test.avalitan.moe"
+{client_cert_cn} = "test.first.example.com"
 {http.request.tls.client.san.dns_names} = []string{
-  "test.avalitan.com",
-  "tester.avalitan.moe",
-  "tester.avalitan.com",
+  "test.second.example.com",
+  "tester.first.example.com",
+  "tester.second.example.com",
 }
 ```
 
@@ -59,7 +59,7 @@ then:
 contains:
 
 ```json
-["test.avalitan.moe","test.avalitan.com","tester.avalitan.moe","tester.avalitan.com"]
+["test.first.example.com","test.second.example.com","tester.first.example.com","tester.second.example.com"]
 ```
 
 Multi-source expressions support two useful native-value forms:
