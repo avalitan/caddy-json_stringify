@@ -27,8 +27,8 @@ func init() {
 //
 // Source expressions in multi-source mode support:
 //
-//   {placeholder}   fetch the native placeholder value
-//   [{placeholder}] wrap the native placeholder value in an array
+//	{placeholder}   fetch the native placeholder value
+//	[{placeholder}] wrap the native placeholder value in an array
 //
 // Arrays contributed by sources are flattened one level into the merged array.
 type Handler struct {
@@ -330,5 +330,5 @@ func normalizePlaceholder(value string) string {
 // Interface guards.
 var (
 	_ caddyhttp.MiddlewareHandler = (*Handler)(nil)
-	_ caddy.Validator              = (*Handler)(nil)
+	_ caddy.Validator             = (*Handler)(nil)
 )
