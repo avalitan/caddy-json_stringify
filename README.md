@@ -35,6 +35,7 @@ Use `sources` when you want to merge several values into one JSON array:
     "[{client_cert_cn}]",
     "{http.request.tls.client.san.dns_names}"
   ],
+	"unique": true,
   "dest": "http.request.tls.client.names_json"
 }
 ```
@@ -79,6 +80,10 @@ wraps that native value in a one-element array before merging.
 Top-level arrays contributed by each source are flattened one level into the final array. Scalars and objects are appended as individual array elements.
 
 Other source expressions are placeholder-expanded and parsed as JSON when possible. If the expanded result is not valid JSON, it is treated as a plain string.
+
+Set `"unique": true` to remove repeated JSON array elements after all sources
+are combined. The first occurrence is retained and the original order is
+preserved. The default is `false` for backwards compatibility.
 
 Use either `source` or `sources`, not both.
 

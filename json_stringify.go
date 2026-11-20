@@ -41,6 +41,7 @@ type Handler struct {
 	Destination string   `json:"destination,omitempty"`
 	Set         string   `json:"set,omitempty"`
 	Dest        string   `json:"dest,omitempty"`
+	Unique      bool     `json:"unique,omitempty"`
 }
 
 // CaddyModule returns the Caddy module information.
@@ -133,6 +134,13 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 		value = merged
 	}
 
+	if h.Unique {
+		value, err = uniqueJSONArray(value)
+		if err != nil {
+			return caddyhttp.Error(http.StatusInternalServerError, fmt.Errorf("deduplicating JSON array: %w", err))
+		}
+	}
+
 	encoded, err := json.Marshal(value)
 	if err != nil {
 		return caddyhttp.Error(http.StatusInternalServerError, fmt.Errorf("JSON-encoding value: %w", err))
@@ -191,6 +199,34 @@ func normalizeJSONValue(value any) any {
 		return value
 	}
 	return normalized
+}
+
+// uniqueJSONArray removes exact duplicate JSON array elements in first-seen
+// order. Values that are not arrays are returned unchanged. Normalizing first
+// allows []string and other concrete slice types to be handled consistently.
+// JSON encoding provides stable comparison keys even for nested values/maps.
+func uniqueJSONArray(value any) (any, error) {
+	value = normalizeJSONValue(value)
+	items, ok := value.([]any)
+	if !ok {
+		return value, nil
+	}
+
+	seen := make(map[string]struct{}, len(items))
+	result := make([]any, 0, len(items))
+	for _, item := range items {
+		encoded, err := json.Marshal(item)
+		if err != nil {
+			return nil, err
+		}
+		key := string(encoded)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 func exactPlaceholder(value string) (string, bool) {
